@@ -77,4 +77,3 @@ pass: admin
 
 URL: http://95.38.188.153:3000
 
-## Challenges
