@@ -1,0 +1,199 @@
+---
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - wget
+      - tar
+    state: present
+    update_cache: yes
+
+- name: Create grafana system user
+  ansible.builtin.user:
+    name: grafana
+    system: yes
+    shell: /usr/sbin/nologin
+    create_home: no
+
+- name: Create Grafana directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: grafana
+    group: grafana
+    mode: '0755'
+  loop:
+    - /opt/grafana
+    - /var/lib/grafana
+    - /var/lib/grafana/dashboards
+    - /var/log/grafana
+    - /etc/grafana
+    - /etc/grafana/provisioning
+    - /etc/grafana/provisioning/datasources
+    - /etc/grafana/provisioning/dashboards
+
+- name: Download Grafana
+  ansible.builtin.get_url:
+    url: https://dl.grafana.com/oss/release/grafana-11.2.0.linux-amd64.tar.gz
+    dest: /tmp/grafana.tar.gz
+    mode: '0644'
+
+- name: Extract Grafana
+  ansible.builtin.unarchive:
+    src: /tmp/grafana.tar.gz
+    dest: /opt/grafana
+    remote_src: yes
+    extra_opts: [--strip-components=1]
+    owner: grafana
+    group: grafana
+
+- name: Create grafana.ini
+  ansible.builtin.copy:
+    dest: /etc/grafana/grafana.ini
+    owner: grafana
+    group: grafana
+    mode: '0644'
+    content: |
+      [server]
+      http_port = {{ grafana_port }}
+      [security]
+      admin_user = admin
+      admin_password = admin
+      [paths]
+      data = /var/lib/grafana
+      logs = /var/log/grafana
+      plugins = /var/lib/grafana/plugins
+      provisioning = /etc/grafana/provisioning
+
+- name: Create Prometheus datasource
+  ansible.builtin.copy:
+    dest: /etc/grafana/provisioning/datasources/prometheus.yml
+    owner: grafana
+    group: grafana
+    mode: '0644'
+    content: |
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://localhost:{{ prometheus_port }}
+          isDefault: true
+          editable: true
+
+- name: Create dashboard provider
+  ansible.builtin.copy:
+    dest: /etc/grafana/provisioning/dashboards/default.yml
+    owner: grafana
+    group: grafana
+    mode: '0644'
+    content: |
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          updateIntervalSeconds: 10
+          options:
+            path: /var/lib/grafana/dashboards
+
+- name: Create CPU and Memory dashboard
+  ansible.builtin.copy:
+    dest: /var/lib/grafana/dashboards/cpu-memory.json
+    owner: grafana
+    group: grafana
+    mode: '0644'
+    content: |
+      {
+        "annotations": { "list": [] },
+        "editable": true,
+        "fiscalYearStartMonth": 0,
+        "graphTooltip": 0,
+        "id": null,
+        "links": [],
+        "panels": [
+          {
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "fieldConfig": {
+              "defaults": {
+                "color": { "mode": "palette-classic" },
+                "unit": "percent"
+              }
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+            "id": 1,
+            "targets": [
+              {
+                "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+                "legendFormat": "CPU Usage %",
+                "refId": "A"
+              }
+            ],
+            "title": "CPU Usage",
+            "type": "timeseries"
+          },
+          {
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "fieldConfig": {
+              "defaults": {
+                "color": { "mode": "palette-classic" },
+                "unit": "bytes"
+              }
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+            "id": 2,
+            "targets": [
+              {
+                "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+                "legendFormat": "Memory Used",
+                "refId": "A"
+              },
+              {
+                "expr": "node_memory_MemTotal_bytes",
+                "legendFormat": "Memory Total",
+                "refId": "B"
+              }
+            ],
+            "title": "Memory Usage",
+            "type": "timeseries"
+          }
+        ],
+        "schemaVersion": 39,
+        "tags": ["node"],
+        "templating": { "list": [] },
+        "time": { "from": "now-1h", "to": "now" },
+        "title": "CPU and Memory",
+        "uid": "cpu-memory",
+        "version": 1
+      }
+
+- name: Create Grafana systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/grafana.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Grafana
+      After=network.target
+
+      [Service]
+      User=grafana
+      Group=grafana
+      Type=simple
+      WorkingDirectory=/opt/grafana
+      ExecStart=/opt/grafana/bin/grafana server --config=/etc/grafana/grafana.ini --homepath=/opt/grafana
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: Enable and start Grafana
+  ansible.builtin.systemd:
+    name: grafana
+    enabled: yes
+    state: started
