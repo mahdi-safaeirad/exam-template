@@ -6,14 +6,27 @@ Then explain your code.
 English is better. Persian is OK.
 
 ## Architecture
+# Scenario 2
 
-Replace this picture with your real design.
+Draw the **output** system. You can use AI.
+Then explain your code.
+
+English is better. Persian is OK.
+
+## Architecture
 
 ```mermaid
-flowchart LR
-  User(["User"]) --> Grafana["Grafana"]
-  Grafana --> Prometheus["Prometheus"]
-```
+flowchart TB
+    subgraph VM["Second VM (95.38.188.153)"]
+        NE[node_exporter :9100]
+        PROM[Prometheus :9090]
+        GRAF[Grafana :3000]
+    end
+
+    User([User / Browser]) --> GRAF
+    GRAF -->|datasource| PROM
+    PROM -->|scrape| NE
+    PROM -->|scrape| PROM
 
 ## Code
 
