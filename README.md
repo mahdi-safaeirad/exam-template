@@ -7,7 +7,7 @@
 flowchart TB
     User([User / Browser]) -->|HTTP :3000| GRAF[Grafana :3000]
 
-    subgraph VM["Second VM (95.38.188.153)"]
+    subgraph VM[" VM EX (95.38.188.153)"]
         GRAF -->|datasource| PROM[Prometheus :9090]
         PROM -->|scrape| NE[node_exporter :9100]
         PROM -->|scrape| PROM
