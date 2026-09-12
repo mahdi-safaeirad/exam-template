@@ -129,9 +129,5 @@ curl -v http://localhost/graph
 
 # Extra problems
 
-Write side problems here. For example: your laptop, a wrong config change, or internet.
-Write how much time each one took.
-
-For example:
 + Weak Internet connection (10 min)
 
