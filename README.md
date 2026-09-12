@@ -5,16 +5,13 @@
 
 ```mermaid
 flowchart TB
-    subgraph VM["Second VM (95.38.188.153)"]
-        NE[node_exporter :9100]
-        PROM[Prometheus :9090]
-        GRAF[Grafana :3000]
-    end
+    User([User / Browser]) -->|HTTP :3000| GRAF[Grafana :3000]
 
-    User([User / Browser]) --> GRAF
-    GRAF -->|datasource| PROM
-    PROM -->|scrape| NE
-    PROM -->|scrape| PROM
+    subgraph VM["Second VM (95.38.188.153)"]
+        GRAF -->|datasource| PROM[Prometheus :9090]
+        PROM -->|scrape| NE[node_exporter :9100]
+        PROM -->|scrape| PROM
+    end
 ```
 
 - **node_exporter** collects CPU, memory and other system metrics on port 9100.
